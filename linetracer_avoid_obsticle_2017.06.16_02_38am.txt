@@ -1,0 +1,243 @@
+#include <SoftwareSerial.h>     // 시리얼 통신 라이브러리 호출
+int pinECHO = 7;
+int pinTRIG = 8;
+int distance;
+int blueRx = 4;     // Rx (보내는핀 설정)
+int blueTx = 5;     // Tx (받는핀 설정)
+int sensorCenter = A0;
+int sensorRight = A2;
+int sensorLeft = A1;
+int cnt=0;
+SoftwareSerial mySerial(blueRx, blueTx);      // 시리얼 통신을 위한 객체 선언
+int phoneData;      // 시리얼 데이터를 받기 위한 변수 선언
+  // 회전 방향 변수 선언
+#define FORWARD  0
+#define BACKWARD 1
+  // 왼쪽, 오른쪽 바퀴 변수 선언
+#define MOTOR_LEFT 0
+#define MOTOR_RIGHT 1
+const byte PWMA = 3;      // PWM control (speed) for motor A
+const byte PWMB = 11;     // PWM control (speed) for motor B
+const byte DIRA = 12;     // Direction control for motor A
+const byte DIRB = 13;     // Direction control for motor B
+ 
+void setup()
+{
+  Serial.begin(9600);       // 시리얼 포트 설정
+  mySerial.begin(9600);      // 선언된 객체와 시리얼 포트 설정
+  pinMode(pinECHO, INPUT);
+  pinMode(pinTRIG, OUTPUT);
+  pinMode(sensorLeft, INPUT);
+  pinMode(sensorRight, INPUT);
+  pinMode(sensorCenter, INPUT);
+  setupArdumoto();      // Set all pins as outputs
+}
+ 
+void loop()
+{
+  digitalWrite(pinTRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pinTRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pinTRIG, LOW);
+  distance = pulseIn(pinECHO, HIGH);
+  int val1 = distance/58;  // 펄스시간을 거리로 계산
+  int center_data=  analogRead(sensorCenter);
+  int left_data =  analogRead(sensorLeft);
+  int right_data =  analogRead(sensorRight);
+  
+  if(left_data > 400){  // 우측바퀴만 전진  // 좌회전
+    //robotLeftTurn(100);
+    driveArdumoto(MOTOR_LEFT, FORWARD, 00);
+    //driveArdumoto(MOTOR_LEFT, BACKWARD, 0);
+    driveArdumoto(MOTOR_RIGHT, BACKWARD, 80);
+  }
+  else if(right_data > 400){  // 좌측 바퀴만 전진  // 우회전
+    //robotRightTurn(100);
+     driveArdumoto(MOTOR_LEFT, FORWARD, 80);
+    driveArdumoto(MOTOR_RIGHT, BACKWARD, 0);
+    //driveArdumoto(MOTOR_RIGHT, FORWARD, 0);
+  }
+  else{
+    robotRight(90);  // 그냥 전진    
+    
+    if(val1<15 && val1>5) {
+      //오른쪽
+      digitalWrite(DIRA, LOW);
+      analogWrite(PWMA, 100);
+      digitalWrite(DIRB, LOW);
+      analogWrite(PWMB, 100);
+      delay(300);
+      //전진
+      digitalWrite(DIRA, LOW);
+      analogWrite(PWMA, 150);
+      digitalWrite(DIRB, HIGH);
+      analogWrite(PWMB, 150);
+      delay(900);
+      //왼쪽
+      digitalWrite(DIRA, HIGH);
+      analogWrite(PWMA, 100);
+      digitalWrite(DIRB, HIGH);
+      analogWrite(PWMB, 100);
+      delay(520);
+      //전진
+      do{
+        robotRight(60);
+      }while(left_data>500 &&right_data<400);
+      robotStop();
+      delay(300);
+    }
+  }
+  
+  phoneData = mySerial.read();      // 시리얼 통신으로 받은 데이터 입력
+  switch(phoneData)
+  {
+    case 1:
+      // Serial.write("1");
+      robotRight(100);     //전진
+      break;
+    case 2:
+      // Serial.write("2");
+      robotLeft(100);  //후진
+      break;
+    case 3:
+      // Serial.write("3");
+      robotBackward(255);  // 왼쪽으로
+      break;
+    case 4:
+      // Serial.write("4");
+      robotForward(255);  //오른쪽으로
+      break;
+    case 5:
+      // Serial.write("5");
+      robotStop();
+      break;
+  }
+  wave();
+}
+void wave(){
+  digitalWrite(pinTRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(pinTRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(pinTRIG, LOW);
+  //delayMicroseconds(2);
+  distance = pulseIn(pinECHO, HIGH);
+  int val1 = distance/58;  // 펄스시간을 거리로 계산
+  mySerial.write(val1);
+  mySerial.print(val1);
+  mySerial.println("cm");
+  //Serial.println(val1);
+  delay(50);
+}
+  // setupArdumoto initialize all pins
+void setupArdumoto()
+{
+  // All pins should be setup as outputs:
+  pinMode(PWMA, OUTPUT);
+  pinMode(PWMB, OUTPUT);
+  pinMode(DIRA, OUTPUT);
+  pinMode(DIRB, OUTPUT);
+  // Initialize all pins as low:
+  digitalWrite(PWMA, LOW);
+  digitalWrite(PWMB, LOW);
+  digitalWrite(DIRA, LOW);
+  digitalWrite(DIRB, LOW);
+}
+  // stopArdumoto makes a motor stop
+void stopArdumoto(byte motor)
+{
+  driveArdumoto(motor, 0, 0);
+}
+
+void driveArdumoto(byte motor, byte dir, byte spd)
+
+{
+
+  if(motor == MOTOR_LEFT)
+
+  {
+
+    digitalWrite(DIRA, dir);
+
+    analogWrite(PWMA, spd);
+
+  }
+
+  else if(motor == MOTOR_RIGHT)
+
+  {
+
+    digitalWrite(DIRB, dir);
+
+    analogWrite(PWMB, spd);
+
+  }  
+
+}
+
+ 
+
+void robotForward(int velocity)  // 오른쪽으로
+
+{
+
+  driveArdumoto(MOTOR_LEFT, FORWARD, velocity);
+
+  driveArdumoto(MOTOR_RIGHT, FORWARD, velocity);
+
+}
+
+void robotRight(int velocity)  //전진
+
+{
+
+  driveArdumoto(MOTOR_LEFT, FORWARD, velocity);
+
+  driveArdumoto(MOTOR_RIGHT, BACKWARD, velocity);
+
+}
+
+ 
+
+void robotRightTurn(int velocity){   //우회전 
+
+  driveArdumoto(MOTOR_LEFT, FORWARD, 0);
+
+  driveArdumoto(MOTOR_RIGHT, FORWARD, velocity);
+
+}
+
+ 
+
+void robotLeft(int velocity)  // 후진
+
+{
+
+  driveArdumoto(MOTOR_LEFT, BACKWARD, velocity);
+
+  driveArdumoto(MOTOR_RIGHT, FORWARD, velocity);
+
+}
+
+ 
+
+void robotBackward(int velocity)  // 왼쪽으로
+
+{
+
+  driveArdumoto(MOTOR_LEFT, BACKWARD, velocity);
+
+  driveArdumoto(MOTOR_RIGHT, BACKWARD, velocity);
+
+}
+
+void robotStop()
+
+{
+
+  stopArdumoto(MOTOR_LEFT);
+
+  stopArdumoto(MOTOR_RIGHT);
+
+}
